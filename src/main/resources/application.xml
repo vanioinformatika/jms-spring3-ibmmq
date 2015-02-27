@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns="http://www.springframework.org/schema/beans"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:p="http://www.springframework.org/schema/p"
+       xmlns:jms="http://www.springframework.org/schema/jms" 
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+                           http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.2.xsd
+                           http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-3.2.xsd
+                           http://www.springframework.org/schema/jms http://www.springframework.org/schema/jms/spring-jms-3.2.xsd">
+
+    <context:property-placeholder location="classpath:application.properties" />
+    <context:annotation-config />
+    <context:component-scan base-package="hu.vanio.jms.spring3.ibmmq"/>
+    
+    <!-- WebSphere MQ Connection Factory -->
+    <bean id="mqConnectionFactory" class="com.ibm.mq.jms.MQQueueConnectionFactory">
+        <property name="hostName">
+            <value>${mq.hostName}</value>
+        </property>
+        <property name="port">
+            <value>${mq.port}</value>
+        </property>
+        <property name="queueManager">
+            <value>${mq.queueManager}</value>
+        </property>
+        <!-- TransportType 1 means pure TCP/IP without any local client. -->
+        <property name="transportType">
+            <value>1</value>
+        </property>
+        <property name="cCSID">
+            <value>${mq.CCSID}</value>
+        </property>
+        
+    </bean>
+    
+    <!-- Security CF adapter: MQ Series default is empty -->
+    <bean id="mqConnectionFactory2" class="org.springframework.jms.connection.UserCredentialsConnectionFactoryAdapter">
+        <property name="targetConnectionFactory"> 
+            <ref bean ="mqConnectionFactory"/> 
+        </property>
+        <property name="username"> 
+            <value>${mq.username}</value> 
+        </property>
+        <property name="password"> 
+            <value>${mq.password}</value> 
+        </property>
+        
+    </bean>
+ 
+    <!-- JMS Queue Connection Factory -->
+    <bean id="jmsQueueConnectionFactory"
+          class="org.springframework.jms.connection.SingleConnectionFactory102">
+        <property name="targetConnectionFactory">
+            <ref bean="mqConnectionFactory2" />
+        </property>
+        <property name="pubSubDomain">
+            <value>${mq.pubSubDomain}</value>
+        </property>
+    </bean>
+ 
+    <!-- JMS Destination Resolver: dynamic -->
+    <bean id="jmsDestinationResolver"
+          class="org.springframework.jms.support.destination.DynamicDestinationResolver">
+    </bean>
+ 
+    <!-- JMS Queue Template -->
+    <bean id="jmsQueueTemplate" class="org.springframework.jms.core.JmsTemplate102">
+        <property name="connectionFactory">
+            <ref bean="jmsQueueConnectionFactory" />
+        </property>
+        <property name="destinationResolver">
+            <ref bean="jmsDestinationResolver" />
+        </property>
+        <property name="pubSubDomain">
+            <value>${mq.pubSubDomain}</value>
+        </property>
+        <property name="receiveTimeout">
+            <value>${mq.receiveTimeout}</value>
+        </property>
+    </bean>
+  
+    <!-- this is the Message Driven POJO (MDP) -->
+    <bean id="jmsQueueListener" class="hu.vanio.jms.spring3.ibmmq.JmsQueueListener" />
+
+    <!-- and this is the message listener container -->
+    <jms:listener-container connection-factory="jmsQueueConnectionFactory">
+        <jms:listener destination="${mq.myDestination}" ref="jmsQueueListener" />
+    </jms:listener-container>
+        
+</beans>
